@@ -1,0 +1,434 @@
+<<<<<<< HEAD
+---
+title: "Proyecto 1 Data Mining"
+author: "Diego Aguilar Dañobeitía"
+date: "8/4/2021"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Cargar los datos
+
+Lo primero que se tiene que hacer para iniciar el análisis de los datos es cargar el archivo que los contiene, lo que se guardará en la variable "data":
+
+```{r}
+
+setwd("D:/Documentos/Files & Stuff/U/Data Mining/Proyecto 1")
+
+data <- read.csv("sanguchez.csv", sep = ";")
+
+head(data)
+
+str(data)
+
+dim(data)
+
+```
+
+Se puede observar que existen 410 entidades con 7 variables.
+
+## Cargar las librerías
+
+Luego, se procede a cargar las librerías necesarias:
+
+```{r}
+
+library(tidyverse)
+
+library(tidyr)
+
+library(datastructures)
+
+library(stringr)
+
+library(janitor)
+
+```
+
+## Pre procesamiento de los datos
+
+Se procede a limpiar los datos en base al objetivo: obtener una receta de un sandwich y asegurar su buena calificación. Antes de pasar al siguiente paso, se estima conveniente definir cómo se va a llevar a cabo el pre procesamiento para este estudio en particular. Primero, se reducirán los datos a las dimensiones necesarias para el experimento. Luego, se eliminarán las entidades con valores faltantes y duplicadas. Finalmente, se mantendrán las entidades cuyo valor en la variable "nota" corresponda al máximo posible, a la vez que se separen cada uno de los ingredientes en uno solo por columna. Esto se hace debido a que el mejor indicador de la valoración de un ingrediente es cuando se considera su presencia en conjunto con otros ingredientes, y si se tiene que, en dicha combinación, tiene nota máxima, entonces ese ingrediente, junto a los demás que cumplen con los mismos criterios, debe ser considerado para la mejor receta, a diferencia de ingredientes presentes en combinaciones con notas peores.
+
+NOTA: Se pensó también en expandir la variable "Ingredientes" en varios subtipos como: "Proteína", "Aderezo" e "Ingredientes restantes", pero el análisis resultante de dicha expansión no sería muy correcto ya lo que se podría hacer es correlacionar ingredientes individuales a una nota, lo que no es representativo de cada sandwich en sí, y puede llevar a combinaciones que no aseguren una buena calificación.
+
+### Reducción de dimensionalidad
+
+Como en este ejercicio se necesita conseguir, a partir de los datos, una receta para asegurar una buena calificación de un sandwich, las únicas variables importantes son las de "Ingredientes" y "nota", por lo que se procede a eliminar las restantes:
+
+```{r}
+
+datared <- data[c("Ingredientes", "nota")]
+
+dim(datared)
+
+```
+
+Se observa que ahora se cuenta con los mismos 410 datos, pero ahora con sólo 2 variables, que son las que se necesitan.
+
+### Eliminación de entidades con valores faltantes
+
+Luego se necesita limpiar las entidades que tienen valores faltantes (NA) de los datos:
+
+```{r}
+
+dataclean <- na.omit(datared)
+
+dim(dataclean)
+
+```
+
+Se observa que ahora existen 402 datos, ya que se eliminaron 8 con valores faltantes.
+
+### Eliminación de entidades duplicadas
+
+Después se procede a eliminar entidades que poseen los mismos valores para cada variable entre sí:
+
+```{r}
+
+dataunique <- unique(dataclean)
+
+dim(dataunique)
+
+```
+
+Se observa que no disminuyó el número de entidades, por lo que no existen entidades duplicadas.
+
+### Selección de entidades en base a su nota
+
+Luego, se van a seleccionar las entidades que tienen el valor máximo en el atributo "nota". Primero se procede a determinar el valor máximo que toma esta variable
+
+```{r}
+
+max(dataunique$nota, na.rm = TRUE)
+
+```
+
+Se tiene que el valor máximo de la nota corresponde a 5. Luego, en base a esto, se seleccionan las entidades que posean esta nota:
+
+```{r}
+
+dataunique[2] <- lapply(dataunique[2], as.numeric)
+
+datafilter <- dataunique %>% filter(nota == 5)
+
+dim(datafilter)
+
+```
+
+Se obtienen 56 entidades con valoración 5.
+
+### Separiación de variable "Ingredientes" en ingredientes individuales
+
+Finalmente, para esta fase de pre procesamiento de los datos, se va a separar cada ingrediente contenido en la variable ingredientes y se van a generar entidades separadas para cada uno de estos, conservando la nota correspondiente al sandwich al que pertenecen. Además de esto, se van a limpiar los datos que incluyen carácteres extra o información irrelevante para este caso, junto a eliminar la variable "nota".
+
+```{r}
+
+datasep <- separate_rows(datafilter, Ingredientes, sep=",", convert = FALSE)
+datasep3 <- separate_rows(datasep, Ingredientes, sep=" en ", convert = FALSE)
+datasep4 <- separate_rows(datasep3, Ingredientes, sep=" con ", convert = FALSE)
+datasep2 <- separate_rows(datasep4, Ingredientes, sep=" y ", convert = FALSE)
+
+for (i in 1:dim(datasep2)[1]) {
+  if (substr(datasep2[i, "Ingredientes"], 1, 1) == ' '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 2, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 3) == 'en '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 4, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 4) == 'con '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 5, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 18) == 'sobre una cama de '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 19, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 3) == 'un '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 4, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 9) == 'toque de '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 10, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 10) == 'exquisito '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 11, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 7) == 'montado'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 8, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"]), nchar(datasep2[i, "Ingredientes"])) == ' '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-1)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"]), nchar(datasep2[i, "Ingredientes"])) == '.'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-1)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-15, nchar(datasep2[i, "Ingredientes"])) == ' hecha ahí mismo'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-16)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-18, nchar(datasep2[i, "Ingredientes"])) == ' (340 grs de carne)'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-19)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-6, nchar(datasep2[i, "Ingredientes"])) == ' casero'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-7)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-8, nchar(datasep2[i, "Ingredientes"])) == ' cubierta'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-9)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-18, nchar(datasep2[i, "Ingredientes"])) == '. Agregado mayonesa'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-19)
+  }
+  datasep2[i, "Ingredientes"] <- tolower(datasep2[i, "Ingredientes"])
+}
+
+datasep2 <- datasep2[!(datasep2$Ingredientes == ""), ]
+
+Ingredientes <- datasep2[c("Ingredientes")]
+
+dim(Ingredientes)
+
+```
+
+## Análisis de los datos
+
+Ya que se han limpiado y ordenado los datos de forma correcta, se procede al análisis de este para resolver la problemática planteada en este caso. Para obtener una receta de sandwich que asegure una buena calificación, se va a crear una tabla que represente el número de ocurrencias de cada ingrediente, con frecuencia descendente, y se calculará el promedio de ingredientes de todos los sandwiches. Con este valor, se tomarán los primeros n-ésimos ingredientes y se tendrá el "sandwich perfecto". Cabe destacar que debe haber un ingrediente que sea algún tipo de pan o similar, porque sin este no se tendrá un sandwich. Si dentro de los primeros n-ésimos ingredientes no se encuentra ningún ingrediente de este tipo, se tomarán los primeros n-1-ésimos ingredientes y se buscará el ingrediente tipo pan con la mayor frecuencia.
+
+```{r}
+
+table1 <- (table(Ingredientes))
+
+tablematrix <- as.data.frame(table1)
+
+tablefinal <- tablematrix[order(-tablematrix$Freq),]
+
+print(tablefinal)
+
+promedio1 = dim(Ingredientes)/dim(datafilter)
+
+promedio2 = promedio1[1]
+
+promediofinal = round(promedio2)
+
+print(promediofinal)
+
+```
+
+## Conclusión
+
+=======
+---
+title: "Proyecto 1 Data Mining"
+author: "Diego Aguilar Dañobeitía"
+date: "8/4/2021"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Cargar los datos
+
+Lo primero que se tiene que hacer para iniciar el análisis de los datos es cargar el archivo que los contiene, lo que se guardará en la variable "data":
+
+```{r}
+
+setwd("D:/Documentos/Files & Stuff/U/Data Mining/Proyecto 1")
+
+data <- read.csv("sanguchez.csv", sep = ";")
+
+head(data)
+
+str(data)
+
+dim(data)
+
+```
+
+Se puede observar que existen 410 entidades con 7 variables.
+
+## Cargar las librerías
+
+Luego, se procede a cargar las librerías necesarias:
+
+```{r}
+
+library(tidyverse)
+
+library(tidyr)
+
+library(datastructures)
+
+library(stringr)
+
+library(janitor)
+
+```
+
+## Pre procesamiento de los datos
+
+Se procede a limpiar los datos en base al objetivo: obtener una receta de un sandwich y asegurar su buena calificación. Antes de pasar al siguiente paso, se estima conveniente definir cómo se va a llevar a cabo el pre procesamiento para este estudio en particular. Primero, se reducirán los datos a las dimensiones necesarias para el experimento. Luego, se eliminarán las entidades con valores faltantes y duplicadas. Finalmente, se mantendrán las entidades cuyo valor en la variable "nota" corresponda al máximo posible, a la vez que se separen cada uno de los ingredientes en uno solo por columna. Esto se hace debido a que el mejor indicador de la valoración de un ingrediente es cuando se considera su presencia en conjunto con otros ingredientes, y si se tiene que, en dicha combinación, tiene nota máxima, entonces ese ingrediente, junto a los demás que cumplen con los mismos criterios, debe ser considerado para la mejor receta, a diferencia de ingredientes presentes en combinaciones con notas peores.
+
+NOTA: Se pensó también en expandir la variable "Ingredientes" en varios subtipos como: "Proteína", "Aderezo" e "Ingredientes restantes", pero el análisis resultante de dicha expansión no sería muy correcto ya lo que se podría hacer es correlacionar ingredientes individuales a una nota, lo que no es representativo de cada sandwich en sí, y puede llevar a combinaciones que no aseguren una buena calificación.
+
+### Reducción de dimensionalidad
+
+Como en este ejercicio se necesita conseguir, a partir de los datos, una receta para asegurar una buena calificación de un sandwich, las únicas variables importantes son las de "Ingredientes" y "nota", por lo que se procede a eliminar las restantes:
+
+```{r}
+
+datared <- data[c("Ingredientes", "nota")]
+
+dim(datared)
+
+```
+
+Se observa que ahora se cuenta con los mismos 410 datos, pero ahora con sólo 2 variables, que son las que se necesitan.
+
+### Eliminación de entidades con valores faltantes
+
+Luego se necesita limpiar las entidades que tienen valores faltantes (NA) de los datos:
+
+```{r}
+
+dataclean <- na.omit(datared)
+
+dim(dataclean)
+
+```
+
+Se observa que ahora existen 402 datos, ya que se eliminaron 8 con valores faltantes.
+
+### Eliminación de entidades duplicadas
+
+Después se procede a eliminar entidades que poseen los mismos valores para cada variable entre sí:
+
+```{r}
+
+dataunique <- unique(dataclean)
+
+dim(dataunique)
+
+```
+
+Se observa que no disminuyó el número de entidades, por lo que no existen entidades duplicadas.
+
+### Selección de entidades en base a su nota
+
+Luego, se van a seleccionar las entidades que tienen el valor máximo en el atributo "nota". Primero se procede a determinar el valor máximo que toma esta variable
+
+```{r}
+
+max(dataunique$nota, na.rm = TRUE)
+
+```
+
+Se tiene que el valor máximo de la nota corresponde a 5. Luego, en base a esto, se seleccionan las entidades que posean esta nota:
+
+```{r}
+
+dataunique[2] <- lapply(dataunique[2], as.numeric)
+
+datafilter <- dataunique %>% filter(nota == 5)
+
+dim(datafilter)
+
+```
+
+Se obtienen 56 entidades con valoración 5.
+
+### Separiación de variable "Ingredientes" en ingredientes individuales
+
+Finalmente, para esta fase de pre procesamiento de los datos, se va a separar cada ingrediente contenido en la variable ingredientes y se van a generar entidades separadas para cada uno de estos, conservando la nota correspondiente al sandwich al que pertenecen. Además de esto, se van a limpiar los datos que incluyen carácteres extra o información irrelevante para este caso, junto a eliminar la variable "nota".
+
+```{r}
+
+datasep <- separate_rows(datafilter, Ingredientes, sep=",", convert = FALSE)
+datasep3 <- separate_rows(datasep, Ingredientes, sep=" en ", convert = FALSE)
+datasep4 <- separate_rows(datasep3, Ingredientes, sep=" con ", convert = FALSE)
+datasep2 <- separate_rows(datasep4, Ingredientes, sep=" y ", convert = FALSE)
+
+for (i in 1:dim(datasep2)[1]) {
+  if (substr(datasep2[i, "Ingredientes"], 1, 1) == ' '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 2, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 3) == 'en '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 4, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 4) == 'con '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 5, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 18) == 'sobre una cama de '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 19, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 3) == 'un '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 4, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 9) == 'toque de '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 10, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 10) == 'exquisito '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 11, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], 1, 7) == 'montado'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 8, nchar(datasep2[i, "Ingredientes"]))
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"]), nchar(datasep2[i, "Ingredientes"])) == ' '){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-1)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"]), nchar(datasep2[i, "Ingredientes"])) == '.'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-1)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-15, nchar(datasep2[i, "Ingredientes"])) == ' hecha ahí mismo'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-16)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-18, nchar(datasep2[i, "Ingredientes"])) == ' (340 grs de carne)'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-19)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-6, nchar(datasep2[i, "Ingredientes"])) == ' casero'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-7)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-8, nchar(datasep2[i, "Ingredientes"])) == ' cubierta'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-9)
+  }
+  if (substr(datasep2[i, "Ingredientes"], nchar(datasep2[i, "Ingredientes"])-18, nchar(datasep2[i, "Ingredientes"])) == '. Agregado mayonesa'){
+    datasep2[i, "Ingredientes"] = str_sub(datasep2[i, "Ingredientes"], 1, nchar(datasep2[i, "Ingredientes"])-19)
+  }
+  datasep2[i, "Ingredientes"] <- tolower(datasep2[i, "Ingredientes"])
+}
+
+datasep2 <- datasep2[!(datasep2$Ingredientes == ""), ]
+
+Ingredientes <- datasep2[c("Ingredientes")]
+
+dim(Ingredientes)
+
+```
+
+## Análisis de los datos
+
+Ya que se han limpiado y ordenado los datos de forma correcta, se procede al análisis de este para resolver la problemática planteada en este caso. Para obtener una receta de sandwich que asegure una buena calificación, se va a crear una tabla que represente el número de ocurrencias de cada ingrediente, con frecuencia descendente, y se calculará el promedio de ingredientes de todos los sandwiches. Con este valor, se tomarán los primeros n-ésimos ingredientes y se tendrá el "sandwich perfecto". Cabe destacar que debe haber un ingrediente que sea algún tipo de pan o similar, porque sin este no se tendrá un sandwich. Si dentro de los primeros n-ésimos ingredientes no se encuentra ningún ingrediente de este tipo, se tomarán los primeros n-1-ésimos ingredientes y se buscará el ingrediente tipo pan con la mayor frecuencia.
+
+```{r}
+
+table1 <- (table(Ingredientes))
+
+tablematrix <- as.data.frame(table1)
+
+tablefinal <- tablematrix[order(-tablematrix$Freq),]
+
+print(tablefinal)
+
+promedio1 = dim(Ingredientes)/dim(datafilter)
+
+promedio2 = promedio1[1]
+
+promediofinal = round(promedio2)
+
+print(promediofinal)
+
+```
+
+## Conclusión
+
+>>>>>>> bef432896c0747fb54228ab072105eb570c5a338
+Según los análisis anteriores, se llega a la conclusión de que el sandwich que no solamente podría asegurar una buena calificación, sino que la mejor de todas, sería un sandwich de 6 ingredientes (contando el pan): tomate, lechuga, palta, cebolla morada y tocino, en pan marraqueta.
